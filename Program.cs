@@ -70,8 +70,10 @@ projectCommand.SetHandler((string project) =>
 // Create "integration" subcommand
 var integrationCommand = new Command("integration", "Add an integration to the solution");
 var integrationArgument = new Argument<string>("integration", "The integration to add");
+integrationArgument.Arity = ArgumentArity.ZeroOrOne; // Make it optional
 integrationCommand.AddArgument(integrationArgument);
 
+// Show integrations in a searchable list
 integrationCommand.SetHandler((string? integration) =>
 {
     var filteredIntegrations = GetIntegrations(integration);
@@ -97,6 +99,7 @@ rootCommand.AddCommand(addCommand);
 // Parse the incoming args and invoke the handler
 return await rootCommand.InvokeAsync(args);
 
+// Get a filtered list of integrations based on the argument passed
 static List<string> GetIntegrations(string? integration) {
     var list = new List<string> {
         "Aspire.Hosting.Redis",
