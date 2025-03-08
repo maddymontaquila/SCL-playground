@@ -1,18 +1,17 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.CommandLine;
-using System.CommandLine.Invocation;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Spectre.Console;
- // Create the root command "aspire"
-var rootCommand = new RootCommand("Aspire command line interface")
-{
-    Name = "aspire"
-};
+
+// Create the root command "aspire"
+var rootCommand = new RootCommand("Aspire command line interface");
 
 // Create the "dev" subcommand
 var devCommand = new Command("dev", "Run the Aspire app host");
-devCommand.SetHandler(() =>
-{
+devCommand.SetAction(action => {
     AnsiConsole.MarkupLine("[green]Starting Aspire...[/]");
     AnsiConsole.Status()
         .Start("Starting services...", ctx => 
@@ -25,12 +24,10 @@ devCommand.SetHandler(() =>
 
 // Create the "new" subcommand with options
 var newCommand = new Command("new", "Create a new Aspire project");
-var templateOption = new Option<string>("--template", "The template to use");
+var templateOption = new Option<string>("--template");
+newCommand.Add(templateOption);
 
-newCommand.AddOption(templateOption);
-
-newCommand.SetHandler((string template) =>
-{
+newCommand.SetAction(template => {
     AnsiConsole.MarkupLine($"[blue]Creating new Aspire project with template:[/] [yellow]{template}[/]");                
     AnsiConsole.Progress()
         .Start(ctx => 
@@ -44,39 +41,36 @@ newCommand.SetHandler((string template) =>
         });
     
     AnsiConsole.MarkupLine("[bold green]Project created successfully![/]");
-}, templateOption);
+});
 
 // Create the "add" command with subcommands
 var addCommand = new Command("add", "Add a project or integration to the solution");
 
 // Create "project" subcommand
 var projectCommand = new Command("project", "Add a project to the solution");
-var projectArgument = new Argument<string>("project", "The project to add");
-projectCommand.AddArgument(projectArgument);
+var projectArgument = new Argument<string>("project");
+projectCommand.Add(projectArgument);
 
-projectCommand.SetHandler((string project) =>
-{
+projectCommand.SetAction(project => {
     var table = new Table();
-    table.AddColumn("Project");
-    table.AddColumn("Status");
-    
-    table.AddRow(project, "[green]Added successfully[/]");
+    table.AddColumn("Project")
+         .AddColumn("Status")
+         .AddRow("[green]Added successfully[/]");
     
     AnsiConsole.Write(new Rule("[yellow]Adding Project[/]").RuleStyle("grey"));
     AnsiConsole.Write(table);
     AnsiConsole.Write(new Rule().RuleStyle("grey"));
-}, projectArgument);
+});
 
 // Create "integration" subcommand
 var integrationCommand = new Command("integration", "Add an integration to the solution");
-var integrationArgument = new Argument<string>("integration", "The integration to add");
-integrationArgument.Arity = ArgumentArity.ZeroOrOne; // Make it optional
-integrationCommand.AddArgument(integrationArgument);
+var integrationArgument = new Argument<string?>("integration");
+integrationArgument.Arity = ArgumentArity.ZeroOrMore; // Allow zero or more arguments
+integrationCommand.Add(integrationArgument);
 
 // Show integrations in a searchable list
-integrationCommand.SetHandler((string? integration) =>
-{
-    var filteredIntegrations = GetIntegrations(integration);
+integrationCommand.SetAction(integration => {
+    var filteredIntegrations = GetIntegrations(integration?.GetResult(integrationArgument)?.ToString());
     var selection = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("Select an integration to add:")
@@ -85,19 +79,20 @@ integrationCommand.SetHandler((string? integration) =>
     );                
     AnsiConsole.Write(new Rule("[yellow]Adding Integration[/]").RuleStyle("grey"));
     AnsiConsole.Write(selection);
-}, integrationArgument);
+    AnsiConsole.Write(new Rule().RuleStyle("grey"));
+});
 
 // Add the subcommands to the add command
-addCommand.AddCommand(projectCommand);
-addCommand.AddCommand(integrationCommand);
+addCommand.Add(projectCommand);
+addCommand.Add(integrationCommand);
 
 // Add subcommands to the root command
-rootCommand.AddCommand(devCommand);
-rootCommand.AddCommand(newCommand);
-rootCommand.AddCommand(addCommand);
+rootCommand.Add(devCommand);
+rootCommand.Add(newCommand);
+rootCommand.Add(addCommand);
 
-// Parse the incoming args and invoke the handler
-return await rootCommand.InvokeAsync(args);
+// Parse the incoming args and invoke the command "aspire"
+await rootCommand.Parse(args).InvokeAsync();
 
 // Get a filtered list of integrations based on the argument passed
 static List<string> GetIntegrations(string? integration) {
